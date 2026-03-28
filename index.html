@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Alex Chiang — Personal Site</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,600;0,9..40,700;1,9..40,400&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap header-inner">
+        <a class="logo" href="#">AC</a>
+        <nav class="nav" aria-label="Primary">
+          <a href="#intro">Intro</a>
+          <a href="#interests">Interests</a>
+          <a href="#goals">Goals</a>
+        </nav>
+      </div>
+    </header>
+
+    <main>
+      <section class="hero wrap" aria-labelledby="hero-title">
+        <div class="hero-copy">
+          <p class="eyebrow">Personal homepage</p>
+          <h1 id="hero-title">Hi, I’m Alex Chiang</h1>
+          <p class="lede">
+            I’m a graduate student exploring how networks stay safe under real-world
+            pressure. This site is a small snapshot of who I am and what I’m working
+            toward.
+          </p>
+          <div class="actions">
+            <a class="btn btn-primary" href="#intro">Read my intro</a>
+            <a
+              class="btn btn-ghost"
+              href="https://github.com/chiangsssssss"
+              rel="noopener noreferrer"
+              >My GitHub</a
+            >
+          </div>
+        </div>
+        <div class="hero-card" role="img" aria-label="Decorative profile card">
+          <div class="avatar" aria-hidden="true">AC</div>
+          <p class="card-title">Network security · NTU</p>
+          <p class="card-meta">M.S. Year 1 · Taipei, Taiwan</p>
+        </div>
+      </section>
+
+      <section id="intro" class="section wrap">
+        <h2>Introduction</h2>
+        <div class="grid-2">
+          <article class="card">
+            <h3>About me</h3>
+            <p>
+              My name is <strong>Alex Chiang</strong> (you can call me Alex). I’m
+              from <strong>Taipei, Taiwan</strong>, where I enjoy the mix of city
+              energy and nearby mountains for weekend hikes.
+            </p>
+            <p>
+              I’m pursuing a <strong>Master’s degree</strong> and focusing on areas
+              related to <strong>computer science and network security</strong>. This
+              term I’m taking a hands-on <strong>Network Attack and Defense</strong>
+              course to connect theory with practical lab work.
+            </p>
+          </article>
+          <article class="card">
+            <h3>Interests &amp; hobbies</h3>
+            <p>
+              Outside class, I like reading about how systems fail in the wild,
+              tinkering with small coding projects, and staying active outdoors. I
+              also enjoy meeting classmates to swap debugging stories and study tips.
+            </p>
+            <ul class="pill-list">
+              <li>Security labs</li>
+              <li>Python scripting</li>
+              <li>Hiking</li>
+              <li>Tech podcasts</li>
+            </ul>
+          </article>
+        </div>
+      </section>
+
+      <section id="interests" class="section wrap section-alt">
+        <h2>Skills I want to learn</h2>
+        <div class="grid-3">
+          <article class="card card-compact">
+            <h3>Traffic analysis</h3>
+            <p>
+              Build intuition for normal vs. suspicious patterns using captures and
+              structured notes.
+            </p>
+          </article>
+          <article class="card card-compact">
+            <h3>Secure design</h3>
+            <p>
+              Practice threat modeling and defensive controls instead of only chasing
+              exploits.
+            </p>
+          </article>
+          <article class="card card-compact">
+            <h3>Automation</h3>
+            <p>
+              Use small, reliable scripts to repeat checks and reduce manual mistakes
+              during labs.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section id="goals" class="section wrap">
+        <h2>Goals</h2>
+        <div class="grid-2">
+          <article class="card">
+            <h3>For this course</h3>
+            <p>
+              I want to finish each lab carefully, document what I learn, and be able
+              to explain both the attack path and the mitigation in plain English.
+            </p>
+          </article>
+          <article class="card">
+            <h3>Looking ahead</h3>
+            <p>
+              Longer term, I hope to contribute to teams that ship resilient systems
+              and teach others how to reason about risk without fear-mongering.
+            </p>
+          </article>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="wrap footer-inner">
+        <p>© <span id="year"></span> Alex Chiang · Built for class · Hosted on GitHub Pages</p>
+      </div>
+    </footer>
+
+    <script>
+      document.getElementById("year").textContent = new Date().getFullYear();
+    </script>
+  </body>
+</html>
