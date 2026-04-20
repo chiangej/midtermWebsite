@@ -221,7 +221,7 @@ export default function App() {
               </a>
               <a
                 className="btn btn-ghost"
-                href="https://github.com/chiangej"
+              
                 rel="noopener noreferrer"
               >
                 My GitHub
