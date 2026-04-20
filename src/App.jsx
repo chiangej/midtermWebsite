@@ -1,6 +1,9 @@
 import { useMemo, useState } from "react";
 import { getFortuneForLocalDate } from "./fortuneData.js";
 import UserPage from "./UserPage.jsx";
+import MessageBoard from "./MessageBoard.jsx";
+import AiPage from "./AiPage.jsx";
+import { loadSession, clearSession, saveSession } from "./utils.js";
 
 const year = new Date().getFullYear();
 
@@ -120,9 +123,21 @@ function SectionHead({ title, kicker }) {
 
 export default function App() {
   const [currentPage, setCurrentPage] = useState("home");
+  const [session, setSession] = useState(loadSession);
+
+  const onLogin = (sess) => setSession(sess);
+  const onLogout = () => { clearSession(); setSession(null); };
 
   if (currentPage === "users") {
-    return <UserPage onNavigate={setCurrentPage} />;
+    return <UserPage onNavigate={setCurrentPage} session={session} onLogin={onLogin} onLogout={onLogout} />;
+  }
+
+  if (currentPage === "board") {
+    return <MessageBoard onNavigate={setCurrentPage} session={session} onLogout={onLogout} />;
+  }
+
+  if (currentPage === "ai") {
+    return <AiPage onNavigate={setCurrentPage} session={session} onLogout={onLogout} />;
   }
 
   return (
@@ -154,6 +169,24 @@ export default function App() {
             >
               Users
             </button>
+            <button
+              className="nav-text-btn"
+              onClick={() => setCurrentPage("board")}
+            >
+              Board
+            </button>
+            <button
+              className="nav-text-btn"
+              onClick={() => setCurrentPage("ai")}
+            >
+              AI Tools
+            </button>
+            {session && (
+              <span className="nav-session">
+                <span className="nav-session-name">{session.username}</span>
+                <button className="nav-logout-btn" onClick={onLogout}>Sign out</button>
+              </span>
+            )}
           </nav>
         </div>
       </header>
@@ -232,7 +265,7 @@ export default function App() {
               <span className="card__corner" aria-hidden="true" />
               <h3>About me</h3>
               <p>
-                My name is <strong>Yi Jie Chiang</strong>).
+                My name is <strong>Yi Jie Chiang</strong>.
                 I’m from <strong>Taipei, Taiwan</strong>, where I enjoy the mix of
                 city energy and nearby mountains for weekend hikes.
               </p>
