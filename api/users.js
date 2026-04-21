@@ -62,6 +62,9 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: "Include at least one uppercase letter, number, or symbol.", field: "password" });
       if (avatar && typeof avatar === "string" && avatar.length > AVATAR_MAX_BYTES)
         return res.status(400).json({ error: "Avatar image too large (max 2 MB)." });
+      // Reject non-image data URLs to prevent SVG/HTML XSS stored in the DB
+      if (avatar && (typeof avatar !== "string" || !/^data:image\/(jpeg|png);base64,[A-Za-z0-9+/]/.test(avatar)))
+        return res.status(400).json({ error: "Avatar must be a JPEG or PNG image." });
 
       const count = await col.countDocuments();
       if (count >= 100) return res.status(400).json({ error: "Registry is currently full." });

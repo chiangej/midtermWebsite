@@ -38,14 +38,18 @@ export default async function handler(req, res) {
     }
 
     if (req.method === "POST") {
-      const { userId, content } = req.body ?? {};
+      const { userId } = req.body ?? {};
+      // Accept both 'content' and legacy 'text' field names
+      const rawContent = req.body?.content ?? req.body?.text;
 
-      if (!userId || !content)
+      if (!userId || !rawContent)
         return res.status(400).json({ error: "Missing required fields." });
-      if (typeof content !== "string" || content.trim().length === 0)
+      if (typeof rawContent !== "string" || rawContent.trim().length === 0)
         return res.status(400).json({ error: "Message cannot be empty." });
-      if (content.length > 1000)
+      if (rawContent.length > 1000)
         return res.status(400).json({ error: "Message too long (max 1000 characters)." });
+      // Server-side sanitization: strip null bytes and dangerous control characters
+      const content = rawContent.trim().replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "");
 
       // Per-user post rate limit: 5 messages per minute
       if (isRateLimited(`msg-user:${userId}`, 5, 60_000))
@@ -74,7 +78,9 @@ export default async function handler(req, res) {
     }
 
     if (req.method === "DELETE") {
-      const { messageId, userId } = req.body ?? {};
+      // Client sends delete params as query string: ?id=...&userId=...
+      const messageId = req.query?.id ?? req.body?.messageId;
+      const userId    = req.query?.userId ?? req.body?.userId;
 
       if (!messageId || !userId)
         return res.status(400).json({ error: "Missing required fields." });

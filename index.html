@@ -6,22 +6,22 @@
     <title>Alex Chiang — Personal Site</title>
 
     <!-- Security: Content Security Policy -->
+    <!-- No 'unsafe-inline' in script-src — prevents inline XSS execution -->
     <meta http-equiv="Content-Security-Policy" content="
       default-src 'self';
-      script-src 'self' 'unsafe-inline';
+      script-src 'self';
       style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
       font-src 'self' https://fonts.gstatic.com;
       img-src 'self' data: blob:;
-      connect-src 'self' https://fonts.googleapis.com https://fonts.gstatic.com https://api.openai.com;
+      connect-src 'self' https://api.openai.com;
       object-src 'none';
       base-uri 'self';
       form-action 'self';
     " />
     <!-- Security: prevent leaking the full URL to third-party referrers -->
     <meta name="referrer" content="strict-origin-when-cross-origin" />
-    <!-- Security: anti-clickjacking (frame-ancestors only works via HTTP header,
-         so this JS guard covers the meta-CSP gap for GitHub Pages) -->
-    <script>if (window.top !== window.self) { window.top.location = window.self.location; }</script>
+    <!-- Security: anti-clickjacking in external script (no unsafe-inline needed) -->
+    <script src="/clickjack-guard.js"></script>
 
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />

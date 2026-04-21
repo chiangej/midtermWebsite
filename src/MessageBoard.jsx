@@ -40,10 +40,8 @@ export default function MessageBoard({ onNavigate, session, onLogout }) {
     setPending(true);
     try {
       const msg = await apiPostMessage({
-        userId:   session.userId,
-        username: session.username,
-        avatar:   session.avatar ?? null,
-        text:     clean,
+        userId:  session.userId,
+        content: clean,
       });
       setMessages(prev => [...prev, msg]);
       setText("");
@@ -184,7 +182,7 @@ export default function MessageBoard({ onNavigate, session, onLogout }) {
                           >✕ Delete</button>
                         )}
                       </div>
-                      <p className="mb-msg-text">{msg.text}</p>
+                      <p className="mb-msg-text">{msg.content}</p>
                     </div>
                   </li>
                 ))}

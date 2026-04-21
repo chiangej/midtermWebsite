@@ -51,11 +51,11 @@ export async function apiLogin({ username, password }) {
 export async function apiGetMessages() {
   return apiFetch("/api/messages");
 }
-export async function apiPostMessage({ userId, username, avatar, text }) {
+export async function apiPostMessage({ userId, content }) {
   return apiFetch("/api/messages", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ userId, username, avatar, text }),
+    body: JSON.stringify({ userId, content }),
   });
 }
 export async function apiDeleteMessage(id, userId) {
@@ -164,14 +164,13 @@ export function clearLoginFail(username) {
 }
 
 // ── Input sanitization ────────────────────────────────────────────
-/** Strip HTML tags, null bytes, and control characters. Truncate to maxLen. */
+/**
+ * Strip null bytes and dangerous control characters. Truncate to maxLen.
+ * Do NOT HTML-encode here — React JSX auto-escapes all text nodes, so
+ * encoding here would cause double-encoding (&amp;lt; displayed on screen).
+ */
 export function sanitizeText(str, maxLen = MSG_MAX_LEN) {
   return str
-    .replace(/<[^>]*>/g, "")                         // remove HTML tags
-    .replace(/[&<>"'`]/g, (c) => ({                  // HTML-encode special chars
-      "&": "&amp;", "<": "&lt;", ">": "&gt;",
-      '"': "&quot;", "'": "&#x27;", "`": "&#x60;",
-    }[c]))
     .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "") // strip control chars
     .slice(0, maxLen);
 }

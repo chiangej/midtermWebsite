@@ -9,6 +9,7 @@ const handlers = {
   "/api/users":    () => import("./api/users.js"),
   "/api/login":    () => import("./api/login.js"),
   "/api/messages": () => import("./api/messages.js"),
+  "/api/ai":       () => import("./api/ai.js"),
 };
 
 const PORT = 3001;

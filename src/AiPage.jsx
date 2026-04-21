@@ -1,29 +1,26 @@
 import { useState } from "react";
 
 const year = new Date().getFullYear();
-const API_KEY = import.meta.env.VITE_OPENAI_API_KEY ?? "";
 
-async function chatCompletion(messages, { temperature = 0.85, max_tokens = 800 } = {}) {
+// OpenAI is now called server-side via /api/ai to keep the API key off the client.
+async function rewriteText(style, text) {
   let res;
   try {
-    res = await fetch("https://api.openai.com/v1/chat/completions", {
+    res = await fetch("/api/ai", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${API_KEY}`,
-      },
-      body: JSON.stringify({ model: "gpt-4o-mini", messages, temperature, max_tokens }),
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ style, text }),
     });
   } catch (networkErr) {
     throw new Error("網路連線失敗，請確認網路後重試。(" + networkErr.message + ")");
   }
   if (!res.ok) {
-    let msg = `OpenAI error ${res.status}`;
-    try { const e = await res.json(); msg = e?.error?.message ?? msg; } catch { /* ignore */ }
+    let msg = `請求失敗 ${res.status}`;
+    try { const e = await res.json(); msg = e?.error ?? msg; } catch { /* ignore */ }
     throw new Error(msg);
   }
   const data = await res.json();
-  return data.choices[0].message.content.trim();
+  return data.result ?? "";
 }
 
 function SectionHead({ title, kicker }) {
@@ -49,14 +46,6 @@ const STYLES = [
   { value: "emojify", label: "🎉 加入 Emoji" },
 ];
 
-const SYSTEM_PROMPTS = {
-  casual:  "請將使用者輸入的文字改寫成輕鬆、友善的口語聊天風格（繁體中文）。",
-  formal:  "請將使用者輸入的文字改寫成嚴謹、正式的公文或商業書信風格（繁體中文）。",
-  poetic:  "請將使用者輸入的文字改寫成富有詩意、文學感的散文風格（繁體中文）。",
-  bullet:  "請將使用者輸入的文字整理成清晰的條列式重點（繁體中文），每點簡短有力。",
-  english: "Please translate the user's input into natural, fluent English.",
-  emojify: "請將使用者輸入的文字改寫，並在適當位置插入大量生動的 Emoji，使文字更活潑（繁體中文）。",
-};
 
 export default function AiPage({ onNavigate, session, onLogout }) {
   const [input, setInput]     = useState("");
@@ -77,13 +66,7 @@ export default function AiPage({ onNavigate, session, onLogout }) {
     setResult("");
     setCopied(false);
     try {
-      const out = await chatCompletion(
-        [
-          { role: "system", content: SYSTEM_PROMPTS[style] },
-          { role: "user",   content: text },
-        ],
-        { max_tokens: 800 },
-      );
+      const out = await rewriteText(style, text);
       setResult(out);
     } catch (err) {
       setError(err.message);
