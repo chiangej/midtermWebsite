@@ -39,7 +39,6 @@ export default function MessageBoard({ onNavigate, session, onLogout }) {
 
     setPending(true);
     try {
-      // userId is no longer sent — server derives it from the Bearer token
       const msg = await apiPostMessage({ content: clean });
       setMessages(prev => [...prev, msg]);
       setText("");

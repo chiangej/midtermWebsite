@@ -1,5 +1,5 @@
 import { isRateLimited } from "./_ratelimit.js";
-import { setCors, getClientIp } from "./_auth.js";
+import { setCors, getClientIp, isOriginAllowed } from "./_auth.js";
 
 // Allowed styles — defined server-side so clients cannot inject arbitrary system prompts
 const SYSTEM_PROMPTS = {
@@ -15,6 +15,9 @@ export default async function handler(req, res) {
   setCors(req, res, "POST,OPTIONS");
   if (req.method === "OPTIONS") return res.status(200).end();
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed." });
+
+  // Drive-by protection: block cross-site POSTs to preserve OpenAI quota.
+  if (!isOriginAllowed(req)) return res.status(403).json({ error: "Forbidden origin." });
 
   const ip = getClientIp(req);
   // Rate limit: 20 AI requests per minute per IP

@@ -1,8 +1,18 @@
 // ════════════════════════════════════════════════════════════════
 //  utils.js  –  Shared security & storage helpers
 // ════════════════════════════════════════════════════════════════
+//
+//  Auth model:
+//  • Credentials live in HttpOnly + Secure + SameSite=Lax cookies
+//    (__Host-session, __Host-csrf) — unreadable to JS, so XSS cannot
+//    exfiltrate the session token.
+//  • Every state-changing request must echo the __Host-csrf cookie
+//    value into an X-CSRF-Token header (double-submit pattern).
+//  • Non-sensitive UI hints (username, avatar) are cached in
+//    localStorage so headers render immediately on load; the real
+//    auth check is always server-side via /api/me.
 
-// ── Storage keys ─────────────────────────────────────────────────
+// ── Storage keys (UI hint only; never holds credentials) ─────────
 export const SESSION_KEY   = "ac-session-v1";
 export const FAIL_PFX      = "ac-fails-";
 export const RATE_KEY      = "ac-rate-reg";
@@ -13,33 +23,40 @@ export const MAX_MESSAGES      = 200;
 export const AVATAR_MAX_BYTES  = 2 * 1024 * 1024;   // 2 MB
 export const MSG_MAX_LEN       = 500;
 export const SESSION_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
-export const RATE_WINDOW_MS    = 60_000;             // 1 min sliding window
-export const RATE_MAX          = 3;                  // max 3 reg/min
-export const LOCKOUT_MAX       = 5;                  // max failed logins
-export const LOCKOUT_MS        = 5 * 60 * 1000;     // 5 min lockout
+export const RATE_WINDOW_MS    = 60_000;
+export const RATE_MAX          = 3;
+export const LOCKOUT_MAX       = 5;
+export const LOCKOUT_MS        = 5 * 60 * 1000;
 
-// ── API client helpers ────────────────────────────────────────────
-/**
- * Attach the current session's Bearer token to outgoing requests.
- * Called automatically by apiFetch when sendAuth is true.
- */
-function authHeader() {
-  const sess = loadSession();
-  return sess?.token ? { Authorization: `Bearer ${sess.token}` } : {};
+// ── CSRF helper ───────────────────────────────────────────────────
+function readCsrfCookie() {
+  const m = document.cookie.match(/(?:^|;\s*)__Host-csrf=([^;]+)/);
+  return m ? decodeURIComponent(m[1]) : null;
 }
 
-async function apiFetch(url, options = {}, { sendAuth = false } = {}) {
+// ── API client helpers ────────────────────────────────────────────
+async function apiFetch(url, options = {}) {
+  const method = (options.method ?? "GET").toUpperCase();
+  const needsCsrf = method !== "GET" && method !== "HEAD";
+  const headers = { ...(options.headers ?? {}) };
+  if (needsCsrf) {
+    const csrf = readCsrfCookie();
+    if (csrf) headers["X-CSRF-Token"] = csrf;
+  }
   let res;
-  const headers = { ...(options.headers ?? {}), ...(sendAuth ? authHeader() : {}) };
   try {
-    res = await fetch(url, { ...options, headers });
+    res = await fetch(url, {
+      ...options,
+      headers,
+      credentials: "include", // always send cookies — auth lives in __Host-session
+    });
   } catch (e) {
     throw new Error("Network error: " + e.message);
   }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    // On 401 from an authenticated request, the token is invalid — clear it
-    if (sendAuth && res.status === 401) clearSession();
+    // 401 = server-side session gone; scrub local UI hints so UI logs out.
+    if (res.status === 401) clearSession();
     throw Object.assign(new Error(data.error || `HTTP ${res.status}`), {
       field: data.field, status: res.status,
     });
@@ -65,31 +82,33 @@ export async function apiLogin({ username, password }) {
   });
 }
 export async function apiLogout() {
-  // Best-effort: revoke the token server-side. Ignore network failures — we
-  // still clear local session below regardless.
-  try {
-    await apiFetch("/api/logout", { method: "POST" }, { sendAuth: true });
-  } catch { /* ignore */ }
+  try { await apiFetch("/api/logout", { method: "POST" }); }
+  catch { /* ignore */ }
   clearSession();
+}
+export async function apiMe() {
+  try { return await apiFetch("/api/me"); }
+  catch { return null; }
 }
 export async function apiGetMessages() {
   return apiFetch("/api/messages");
 }
 export async function apiPostMessage({ content }) {
-  // No userId sent — server derives it from the Bearer token
   return apiFetch("/api/messages", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ content }),
-  }, { sendAuth: true });
+  });
 }
 export async function apiDeleteMessage(id) {
   return apiFetch(`/api/messages?id=${encodeURIComponent(id)}`, {
     method: "DELETE",
-  }, { sendAuth: true });
+  });
 }
 
-// ── Session (localStorage — survives page reload, expires in 7 days) ──
+// ── Session UI cache (localStorage) ─────────────────────────────
+// Stores only public display info. The real session lives server-side
+// in an HttpOnly cookie — this cache is wiped whenever /api/me fails.
 export function loadSession() {
   try {
     const raw = localStorage.getItem(SESSION_KEY);
@@ -102,7 +121,9 @@ export function loadSession() {
 export function saveSession(sess) {
   try {
     localStorage.setItem(SESSION_KEY, JSON.stringify({
-      ...sess,
+      userId:   sess.userId,
+      username: sess.username,
+      avatar:   sess.avatar ?? null,
       expiresAt: Date.now() + SESSION_EXPIRY_MS,
     }));
   } catch { /* ignore */ }
@@ -112,15 +133,13 @@ export function clearSession() {
 }
 
 // ── File / image validation ───────────────────────────────────────
-/** Check magic bytes: JPEG (FF D8 FF) or PNG (89 50 4E 47). */
 export async function validateImageMagicBytes(file) {
   const buf = await file.slice(0, 8).arrayBuffer();
   const b = new Uint8Array(buf);
-  if (b[0] === 0xFF && b[1] === 0xD8 && b[2] === 0xFF) return true;                          // JPEG
-  if (b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4E && b[3] === 0x47) return true;         // PNG
+  if (b[0] === 0xFF && b[1] === 0xD8 && b[2] === 0xFF) return true;
+  if (b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4E && b[3] === 0x47) return true;
   return false;
 }
-/** Read a File as a base64 data URL. */
 export function fileToDataUrl(file) {
   return new Promise((resolve, reject) => {
     const r = new FileReader();
@@ -130,7 +149,7 @@ export function fileToDataUrl(file) {
   });
 }
 
-// ── Client-side rate limiting (UX hint only — server is the source of truth) ──
+// ── Client-side rate limiting (UX hint only) ─────────────────────
 export function isRateLimited() {
   try {
     const raw = sessionStorage.getItem(RATE_KEY);
@@ -172,10 +191,6 @@ export function clearLoginFail(username) {
 }
 
 // ── Input sanitization ────────────────────────────────────────────
-/**
- * Strip null bytes and dangerous control characters. Truncate to maxLen.
- * Do NOT HTML-encode here — React JSX auto-escapes all text nodes.
- */
 export function sanitizeText(str, maxLen = MSG_MAX_LEN) {
   return str
     .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "")

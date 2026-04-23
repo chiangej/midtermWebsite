@@ -200,13 +200,12 @@ export default function UserPage({ onNavigate, session, onLogin, onLogout }) {
         avatar,
       });
 
-      // Token-based auth: server returns a Bearer token on successful register.
-      // Store it in the session so write-API calls can authenticate.
+      // Auth credential lives in an HttpOnly cookie set by the server.
+      // localStorage only caches public display info for fast UI hydration.
       const sess = {
         userId:   newUser.id,
         username: newUser.username,
         avatar:   newUser.avatar,
-        token:    newUser.token,
       };
       saveSession(sess);
       onLogin(sess);
@@ -239,7 +238,6 @@ export default function UserPage({ onNavigate, session, onLogin, onLogout }) {
         userId:   user.id,
         username: user.username,
         avatar:   user.avatar,
-        token:    user.token,
       };
       saveSession(sess);
       onLogin(sess);

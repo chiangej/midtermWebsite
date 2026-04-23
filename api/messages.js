@@ -22,9 +22,9 @@ export default async function handler(req, res) {
       );
     }
 
-    // ── Write operations require a valid Bearer token ───────────────
-    // The server derives userId from the authenticated session; the client
-    // cannot specify who is posting / deleting. This kills impersonation.
+    // ── Write operations: cookie session + CSRF double-submit + Origin check ──
+    // requireAuth validates all three. userId is derived from the session so
+    // the client cannot specify who is posting / deleting.
     if (req.method === "POST" || req.method === "DELETE") {
       const session = await requireAuth(req);
       if (!session) return res.status(401).json({ error: "Authentication required." });

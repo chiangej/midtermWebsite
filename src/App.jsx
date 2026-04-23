@@ -1,9 +1,9 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { getFortuneForLocalDate } from "./fortuneData.js";
 import UserPage from "./UserPage.jsx";
 import MessageBoard from "./MessageBoard.jsx";
 import AiPage from "./AiPage.jsx";
-import { loadSession, apiLogout } from "./utils.js";
+import { loadSession, saveSession, clearSession, apiLogout, apiMe } from "./utils.js";
 
 const year = new Date().getFullYear();
 
@@ -125,9 +125,22 @@ export default function App() {
   const [currentPage, setCurrentPage] = useState("home");
   const [session, setSession] = useState(loadSession);
 
+  // On mount, verify the HttpOnly cookie against the server. The localStorage
+  // cache is only a UI hint — /api/me is the source of truth.
+  useEffect(() => {
+    apiMe().then((me) => {
+      if (me) {
+        const sess = { userId: me.id, username: me.username, avatar: me.avatar };
+        saveSession(sess);
+        setSession(sess);
+      } else {
+        clearSession();
+        setSession(null);
+      }
+    });
+  }, []);
+
   const onLogin = (sess) => setSession(sess);
-  // Revoke the token server-side before clearing local session. apiLogout
-  // swallows network errors and always calls clearSession() internally.
   const onLogout = async () => { await apiLogout(); setSession(null); };
 
   if (currentPage === "users") {

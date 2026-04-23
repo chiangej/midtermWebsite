@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import { getDb } from "./_db.js";
 import { isRateLimited } from "./_ratelimit.js";
-import { setCors, getClientIp, createSession } from "./_auth.js";
+import { setCors, getClientIp, issueSession } from "./_auth.js";
 
 const AVATAR_MAX_BYTES = 2.5 * 1024 * 1024;
 
@@ -25,8 +25,8 @@ export default async function handler(req, res) {
       const users = await col
         .find({}, { projection: { passwordHash: 0, salt: 0, emailLower: 0, usernameLower: 0 } })
         .sort({ joinedAt: 1 }).toArray();
-      // ObjectId is no longer a secret: write operations require a Bearer token,
-      // so leaked IDs cannot be used for impersonation.
+      // ObjectId is no longer a secret: write operations require a valid
+      // session cookie + CSRF, so leaked IDs cannot be used for impersonation.
       return res.status(200).json(users.map(({ _id, ...u }) => ({ ...u, id: _id.toString() })));
     }
 
@@ -81,8 +81,8 @@ export default async function handler(req, res) {
       };
       const result = await col.insertOne(doc);
 
-      // Issue a session token — client gets it once and uses it as Bearer auth
-      const token = await createSession({
+      // Issue session: sets __Host-session (HttpOnly) + __Host-csrf cookies
+      await issueSession(res, {
         id: result.insertedId, username: doc.username, avatar: doc.avatar,
       });
 
@@ -90,7 +90,6 @@ export default async function handler(req, res) {
       return res.status(201).json({
         ...pub,
         id: result.insertedId.toString(),
-        token,
       });
     }
 

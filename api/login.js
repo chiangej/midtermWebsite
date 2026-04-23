@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import { getDb } from "./_db.js";
 import { isRateLimited } from "./_ratelimit.js";
-import { setCors, getClientIp, createSession } from "./_auth.js";
+import { setCors, getClientIp, issueSession } from "./_auth.js";
 
 function hashPw(password, salt) {
   return crypto.pbkdf2Sync(password, salt, 100_000, 32, "sha256").toString("hex");
@@ -52,13 +52,13 @@ export default async function handler(req, res) {
     if (!timingSafeCompare(computed, user.passwordHash))
       return res.status(401).json(INVALID_CREDS);
 
-    // Issue a fresh session token on every successful login
-    const token = await createSession({
+    // Issue fresh session on every successful login (rotates both cookies)
+    await issueSession(res, {
       id: user._id, username: user.username, avatar: user.avatar,
     });
 
     const { passwordHash: _ph, salt: _s, usernameLower: _ul, emailLower: _el, _id, ...pub } = user;
-    return res.status(200).json({ ...pub, id: _id.toString(), token });
+    return res.status(200).json({ ...pub, id: _id.toString() });
   } catch (err) {
     console.error("api/login:", err);
     return res.status(500).json({ error: "Internal server error." });

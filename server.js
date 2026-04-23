@@ -9,6 +9,7 @@ const handlers = {
   "/api/users":    () => import("./api/users.js"),
   "/api/login":    () => import("./api/login.js"),
   "/api/logout":   () => import("./api/logout.js"),
+  "/api/me":       () => import("./api/me.js"),
   "/api/messages": () => import("./api/messages.js"),
   "/api/ai":       () => import("./api/ai.js"),
 };
@@ -20,10 +21,15 @@ const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://localhost:${PORT}`);
   const path = url.pathname;
 
-  // CORS for Vite dev server on :5173
-  res.setHeader("Access-Control-Allow-Origin", "http://localhost:5173");
+  // CORS for Vite dev server on :5173 — credentialed (cookies)
+  const origin = req.headers.origin ?? "";
+  if (origin === "http://localhost:5173" || origin === "http://localhost:3001") {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Access-Control-Allow-Credentials", "true");
+  }
   res.setHeader("Access-Control-Allow-Methods", "GET,POST,DELETE,OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, X-CSRF-Token");
+  res.setHeader("Vary", "Origin");
 
   if (req.method === "OPTIONS") { res.writeHead(204); res.end(); return; }
 
@@ -87,6 +93,7 @@ const server = http.createServer(async (req, res) => {
     },
     end()         { res.writeHead(statusCode); res.end(); },
     setHeader: res.setHeader.bind(res),
+    getHeader: res.getHeader.bind(res), // needed so multi-cookie append works
   };
 
   try {
