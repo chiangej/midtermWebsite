@@ -39,10 +39,8 @@ export default function MessageBoard({ onNavigate, session, onLogout }) {
 
     setPending(true);
     try {
-      const msg = await apiPostMessage({
-        userId:  session.userId,
-        content: clean,
-      });
+      // userId is no longer sent — server derives it from the Bearer token
+      const msg = await apiPostMessage({ content: clean });
       setMessages(prev => [...prev, msg]);
       setText("");
       setError("");
@@ -56,7 +54,7 @@ export default function MessageBoard({ onNavigate, session, onLogout }) {
   const handleDelete = async (msgId) => {
     if (!session) return;
     try {
-      await apiDeleteMessage(msgId, session.userId);
+      await apiDeleteMessage(msgId);
       setMessages(prev => prev.filter(m => m.id !== msgId));
     } catch { /* ignore */ }
   };
@@ -170,9 +168,9 @@ export default function MessageBoard({ onNavigate, session, onLogout }) {
                     <div className="mb-msg-body">
                       <div className="mb-msg-meta">
                         <span className="mb-msg-username">{msg.username}</span>
-                        <time className="mb-msg-time" dateTime={msg.postedAt}
-                          title={new Date(msg.postedAt).toLocaleString()}>
-                          {relativeTime(msg.postedAt)}
+                        <time className="mb-msg-time" dateTime={msg.createdAt}
+                          title={new Date(msg.createdAt).toLocaleString()}>
+                          {relativeTime(msg.createdAt)}
                         </time>
                         {session?.userId === msg.userId && (
                           <button

@@ -1,32 +1,19 @@
 import crypto from "node:crypto";
 import { getDb } from "./_db.js";
 import { isRateLimited } from "./_ratelimit.js";
+import { setCors, getClientIp, createSession } from "./_auth.js";
 
-const ALLOWED_ORIGINS = [
-  "https://midtermweb-rose.vercel.app",
-  "http://localhost:5173",
-];
 const AVATAR_MAX_BYTES = 2.5 * 1024 * 1024;
-
-function setCors(req, res) {
-  const origin = req.headers?.origin ?? "";
-  if (ALLOWED_ORIGINS.includes(origin)) {
-    res.setHeader("Access-Control-Allow-Origin", origin);
-  }
-  res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-  res.setHeader("Vary", "Origin");
-}
 
 function hashPw(password, salt) {
   return crypto.pbkdf2Sync(password, salt, 100_000, 32, "sha256").toString("hex");
 }
 
 export default async function handler(req, res) {
-  setCors(req, res);
+  setCors(req, res, "GET,POST,OPTIONS");
   if (req.method === "OPTIONS") return res.status(200).end();
 
-  const ip = req.headers?.["x-forwarded-for"]?.split(",")[0].trim() ?? "unknown";
+  const ip = getClientIp(req);
   if (isRateLimited(`users:${ip}`, 15, 60_000))
     return res.status(429).json({ error: "Too many requests. Please slow down." });
 
@@ -38,6 +25,8 @@ export default async function handler(req, res) {
       const users = await col
         .find({}, { projection: { passwordHash: 0, salt: 0, emailLower: 0, usernameLower: 0 } })
         .sort({ joinedAt: 1 }).toArray();
+      // ObjectId is no longer a secret: write operations require a Bearer token,
+      // so leaked IDs cannot be used for impersonation.
       return res.status(200).json(users.map(({ _id, ...u }) => ({ ...u, id: _id.toString() })));
     }
 
@@ -62,10 +51,6 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: "Include at least one uppercase letter, number, or symbol.", field: "password" });
       if (avatar && typeof avatar === "string" && avatar.length > AVATAR_MAX_BYTES)
         return res.status(400).json({ error: "Avatar image too large (max 2 MB)." });
-      // Reject non-image data URLs to prevent SVG/HTML XSS stored in the DB.
-      // Also enforce a minimum base64 payload length so callers can't sneak in a
-      // 1-character garbage body that passes the prefix regex but isn't a real image
-      // (smallest valid JPEG is ~107 bytes ≈ 144 base64 chars; PNG is similar).
       if (avatar) {
         const b64 = typeof avatar === "string" ? (avatar.split(",")[1] ?? "") : "";
         if (!/^data:image\/(jpeg|png);base64,/.test(avatar) || b64.length < 144)
@@ -95,8 +80,18 @@ export default async function handler(req, res) {
         joinedAt: new Date().toISOString(),
       };
       const result = await col.insertOne(doc);
+
+      // Issue a session token — client gets it once and uses it as Bearer auth
+      const token = await createSession({
+        id: result.insertedId, username: doc.username, avatar: doc.avatar,
+      });
+
       const { passwordHash: _ph, salt: _s, usernameLower: _ul, emailLower: _el, ...pub } = doc;
-      return res.status(201).json({ ...pub, id: result.insertedId.toString() });
+      return res.status(201).json({
+        ...pub,
+        id: result.insertedId.toString(),
+        token,
+      });
     }
 
     return res.status(405).json({ error: "Method not allowed." });

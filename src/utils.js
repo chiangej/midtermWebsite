@@ -19,15 +19,31 @@ export const LOCKOUT_MAX       = 5;                  // max failed logins
 export const LOCKOUT_MS        = 5 * 60 * 1000;     // 5 min lockout
 
 // ── API client helpers ────────────────────────────────────────────
-async function apiFetch(url, options = {}) {
+/**
+ * Attach the current session's Bearer token to outgoing requests.
+ * Called automatically by apiFetch when sendAuth is true.
+ */
+function authHeader() {
+  const sess = loadSession();
+  return sess?.token ? { Authorization: `Bearer ${sess.token}` } : {};
+}
+
+async function apiFetch(url, options = {}, { sendAuth = false } = {}) {
   let res;
+  const headers = { ...(options.headers ?? {}), ...(sendAuth ? authHeader() : {}) };
   try {
-    res = await fetch(url, options);
+    res = await fetch(url, { ...options, headers });
   } catch (e) {
     throw new Error("Network error: " + e.message);
   }
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw Object.assign(new Error(data.error || `HTTP ${res.status}`), { field: data.field, status: res.status });
+  if (!res.ok) {
+    // On 401 from an authenticated request, the token is invalid — clear it
+    if (sendAuth && res.status === 401) clearSession();
+    throw Object.assign(new Error(data.error || `HTTP ${res.status}`), {
+      field: data.field, status: res.status,
+    });
+  }
   return data;
 }
 
@@ -48,20 +64,29 @@ export async function apiLogin({ username, password }) {
     body: JSON.stringify({ username, password }),
   });
 }
+export async function apiLogout() {
+  // Best-effort: revoke the token server-side. Ignore network failures — we
+  // still clear local session below regardless.
+  try {
+    await apiFetch("/api/logout", { method: "POST" }, { sendAuth: true });
+  } catch { /* ignore */ }
+  clearSession();
+}
 export async function apiGetMessages() {
   return apiFetch("/api/messages");
 }
-export async function apiPostMessage({ userId, content }) {
+export async function apiPostMessage({ content }) {
+  // No userId sent — server derives it from the Bearer token
   return apiFetch("/api/messages", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ userId, content }),
-  });
+    body: JSON.stringify({ content }),
+  }, { sendAuth: true });
 }
-export async function apiDeleteMessage(id, userId) {
-  return apiFetch(`/api/messages?id=${encodeURIComponent(id)}&userId=${encodeURIComponent(userId)}`, {
+export async function apiDeleteMessage(id) {
+  return apiFetch(`/api/messages?id=${encodeURIComponent(id)}`, {
     method: "DELETE",
-  });
+  }, { sendAuth: true });
 }
 
 // ── Session (localStorage — survives page reload, expires in 7 days) ──
@@ -86,21 +111,6 @@ export function clearSession() {
   try { localStorage.removeItem(SESSION_KEY); } catch { /* ignore */ }
 }
 
-// ── Crypto ────────────────────────────────────────────────────────
-/** Generate a random 32-hex-char salt. */
-export function generateSalt() {
-  const arr = new Uint8Array(16);
-  crypto.getRandomValues(arr);
-  return Array.from(arr).map(b => b.toString(16).padStart(2, "0")).join("");
-}
-/** SHA-256 hash of (salt + password), returns hex string. */
-export async function hashPassword(password, salt) {
-  const enc = new TextEncoder();
-  const data = enc.encode(salt + password);
-  const buf = await crypto.subtle.digest("SHA-256", data);
-  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
-}
-
 // ── File / image validation ───────────────────────────────────────
 /** Check magic bytes: JPEG (FF D8 FF) or PNG (89 50 4E 47). */
 export async function validateImageMagicBytes(file) {
@@ -120,8 +130,7 @@ export function fileToDataUrl(file) {
   });
 }
 
-// ── Rate limiting ─────────────────────────────────────────────────
-/** Returns true and does NOT record if already over limit; records + returns false otherwise. */
+// ── Client-side rate limiting (UX hint only — server is the source of truth) ──
 export function isRateLimited() {
   try {
     const raw = sessionStorage.getItem(RATE_KEY);
@@ -145,7 +154,6 @@ export function isLoginLocked(username) {
     return false;
   } catch { return false; }
 }
-/** Record a failed login attempt. Returns current fail count. */
 export function recordLoginFail(username) {
   try {
     const key = FAIL_PFX + username.toLowerCase();
@@ -166,12 +174,11 @@ export function clearLoginFail(username) {
 // ── Input sanitization ────────────────────────────────────────────
 /**
  * Strip null bytes and dangerous control characters. Truncate to maxLen.
- * Do NOT HTML-encode here — React JSX auto-escapes all text nodes, so
- * encoding here would cause double-encoding (&amp;lt; displayed on screen).
+ * Do NOT HTML-encode here — React JSX auto-escapes all text nodes.
  */
 export function sanitizeText(str, maxLen = MSG_MAX_LEN) {
   return str
-    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "") // strip control chars
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "")
     .slice(0, maxLen);
 }
 

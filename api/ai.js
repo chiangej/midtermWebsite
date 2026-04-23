@@ -1,9 +1,5 @@
 import { isRateLimited } from "./_ratelimit.js";
-
-const ALLOWED_ORIGINS = [
-  "https://midtermweb-rose.vercel.app",
-  "http://localhost:5173",
-];
+import { setCors, getClientIp } from "./_auth.js";
 
 // Allowed styles — defined server-side so clients cannot inject arbitrary system prompts
 const SYSTEM_PROMPTS = {
@@ -15,22 +11,12 @@ const SYSTEM_PROMPTS = {
   emojify: "請將使用者輸入的文字改寫，並在適當位置插入大量生動的 Emoji，使文字更活潑（繁體中文）。",
 };
 
-function setCors(req, res) {
-  const origin = req.headers?.origin ?? "";
-  if (ALLOWED_ORIGINS.includes(origin)) {
-    res.setHeader("Access-Control-Allow-Origin", origin);
-  }
-  res.setHeader("Access-Control-Allow-Methods", "POST,OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-  res.setHeader("Vary", "Origin");
-}
-
 export default async function handler(req, res) {
-  setCors(req, res);
+  setCors(req, res, "POST,OPTIONS");
   if (req.method === "OPTIONS") return res.status(200).end();
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed." });
 
-  const ip = req.headers?.["x-forwarded-for"]?.split(",")[0].trim() ?? "unknown";
+  const ip = getClientIp(req);
   // Rate limit: 20 AI requests per minute per IP
   if (isRateLimited(`ai:${ip}`, 20, 60_000))
     return res.status(429).json({ error: "Too many requests. Please slow down." });

@@ -3,7 +3,7 @@ import { getFortuneForLocalDate } from "./fortuneData.js";
 import UserPage from "./UserPage.jsx";
 import MessageBoard from "./MessageBoard.jsx";
 import AiPage from "./AiPage.jsx";
-import { loadSession, clearSession, saveSession } from "./utils.js";
+import { loadSession, apiLogout } from "./utils.js";
 
 const year = new Date().getFullYear();
 
@@ -126,7 +126,9 @@ export default function App() {
   const [session, setSession] = useState(loadSession);
 
   const onLogin = (sess) => setSession(sess);
-  const onLogout = () => { clearSession(); setSession(null); };
+  // Revoke the token server-side before clearing local session. apiLogout
+  // swallows network errors and always calls clearSession() internally.
+  const onLogout = async () => { await apiLogout(); setSession(null); };
 
   if (currentPage === "users") {
     return <UserPage onNavigate={setCurrentPage} session={session} onLogin={onLogin} onLogout={onLogout} />;

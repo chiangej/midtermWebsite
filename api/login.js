@@ -1,21 +1,7 @@
 import crypto from "node:crypto";
 import { getDb } from "./_db.js";
 import { isRateLimited } from "./_ratelimit.js";
-
-const ALLOWED_ORIGINS = [
-  "https://midtermweb-rose.vercel.app",
-  "http://localhost:5173",
-];
-
-function setCors(req, res) {
-  const origin = req.headers?.origin ?? "";
-  if (ALLOWED_ORIGINS.includes(origin)) {
-    res.setHeader("Access-Control-Allow-Origin", origin);
-  }
-  res.setHeader("Access-Control-Allow-Methods", "POST,OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-  res.setHeader("Vary", "Origin");
-}
+import { setCors, getClientIp, createSession } from "./_auth.js";
 
 function hashPw(password, salt) {
   return crypto.pbkdf2Sync(password, salt, 100_000, 32, "sha256").toString("hex");
@@ -29,11 +15,11 @@ function timingSafeCompare(a, b) {
 }
 
 export default async function handler(req, res) {
-  setCors(req, res);
+  setCors(req, res, "POST,OPTIONS");
   if (req.method === "OPTIONS") return res.status(200).end();
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed." });
 
-  const ip = req.headers?.["x-forwarded-for"]?.split(",")[0].trim() ?? "unknown";
+  const ip = getClientIp(req);
 
   // IP-level rate limit: 20 attempts per 5 minutes
   if (isRateLimited(`login-ip:${ip}`, 20, 300_000))
@@ -66,8 +52,13 @@ export default async function handler(req, res) {
     if (!timingSafeCompare(computed, user.passwordHash))
       return res.status(401).json(INVALID_CREDS);
 
+    // Issue a fresh session token on every successful login
+    const token = await createSession({
+      id: user._id, username: user.username, avatar: user.avatar,
+    });
+
     const { passwordHash: _ph, salt: _s, usernameLower: _ul, emailLower: _el, _id, ...pub } = user;
-    return res.status(200).json({ ...pub, id: _id.toString() });
+    return res.status(200).json({ ...pub, id: _id.toString(), token });
   } catch (err) {
     console.error("api/login:", err);
     return res.status(500).json({ error: "Internal server error." });

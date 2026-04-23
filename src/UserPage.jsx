@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import {
-  MAX_USERS, AVATAR_MAX_BYTES, LOCKOUT_MAX,
+  AVATAR_MAX_BYTES, LOCKOUT_MAX,
   apiGetUsers, apiRegister, apiLogin,
   validateImageMagicBytes, fileToDataUrl,
   isRateLimited, isLoginLocked, recordLoginFail, clearLoginFail,
@@ -200,7 +200,14 @@ export default function UserPage({ onNavigate, session, onLogin, onLogout }) {
         avatar,
       });
 
-      const sess = { userId: newUser.id, username: newUser.username, avatar: newUser.avatar };
+      // Token-based auth: server returns a Bearer token on successful register.
+      // Store it in the session so write-API calls can authenticate.
+      const sess = {
+        userId:   newUser.id,
+        username: newUser.username,
+        avatar:   newUser.avatar,
+        token:    newUser.token,
+      };
       saveSession(sess);
       onLogin(sess);
 
@@ -228,7 +235,12 @@ export default function UserPage({ onNavigate, session, onLogin, onLogout }) {
     try {
       const user = await apiLogin({ username, password: loginForm.password });
       clearLoginFail(username);
-      const sess = { userId: user.id, username: user.username, avatar: user.avatar };
+      const sess = {
+        userId:   user.id,
+        username: user.username,
+        avatar:   user.avatar,
+        token:    user.token,
+      };
       saveSession(sess);
       onLogin(sess);
       setLoginForm(EMPTY_LOGIN);
