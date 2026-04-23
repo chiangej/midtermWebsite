@@ -26,34 +26,10 @@ function SectionHead({ title, kicker }) {
 }
 
 export function UserAvatar({ user, size = 40 }) {
+  const [imgError, setImgError] = useState(false);
   const style = { width: size, height: size };
-  if (user?.avatar) {
-    // Only render data: URIs (JPEG/PNG validated by server).
-    // Block javascript: / data:text/html and other non-image schemes.
-    const safeSrc = /^data:image\/(jpeg|png);base64,/.test(user.avatar ?? "")
-      ? user.avatar
-      : undefined;
-    if (!safeSrc) return (
-      <div
-        className="up-user-avatar"
-        style={{ ...style, background: avatarInitialColor(user?.username ?? "?") }}
-        aria-hidden="true"
-      >
-        {(user?.username ?? "?").charAt(0).toUpperCase()}
-      </div>
-    );
-    return (
-      <img
-        src={safeSrc}
-        alt={user.username}
-        className="up-avatar-img"
-        style={style}
-        referrerPolicy="no-referrer"
-        onError={(e) => { e.currentTarget.style.display = "none"; }}
-      />
-    );
-  }
-  return (
+
+  const initial = (
     <div
       className="up-user-avatar"
       style={{ ...style, background: avatarInitialColor(user?.username ?? "?") }}
@@ -62,6 +38,29 @@ export function UserAvatar({ user, size = 40 }) {
       {(user?.username ?? "?").charAt(0).toUpperCase()}
     </div>
   );
+
+  if (user?.avatar && !imgError) {
+    // Only render data: URIs with JPEG or PNG MIME type.
+    // Blocks SVG/HTML/javascript: XSS vectors stored in the DB.
+    const safeSrc = /^data:image\/(jpeg|png);base64,[A-Za-z0-9+/]/.test(user.avatar)
+      ? user.avatar
+      : null;
+    // If avatar doesn't pass the whitelist, show the initial letter fallback.
+    if (!safeSrc) return initial;
+    return (
+      <img
+        src={safeSrc}
+        alt={user.username}
+        className="up-avatar-img"
+        style={style}
+        referrerPolicy="no-referrer"
+        // On load failure (corrupted / fake data URI), fall back to initial letter
+        // instead of hiding the element and leaving blank space.
+        onError={() => setImgError(true)}
+      />
+    );
+  }
+  return initial;
 }
 
 // ── Avatar file picker ────────────────────────────────────────────
@@ -74,7 +73,12 @@ function AvatarPicker({ preview, error, onChange }) {
       </label>
       <div className="up-avatar-picker">
         {preview ? (
-          <img src={preview} alt="Avatar preview" className="up-avatar-preview" />
+          <img
+            src={/^data:image\/(jpeg|png);base64,[A-Za-z0-9+/]/.test(preview) ? preview : ""}
+            alt="Avatar preview"
+            className="up-avatar-preview"
+            onError={(e) => { e.currentTarget.style.display = "none"; }}
+          />
         ) : (
           <div className="up-avatar-placeholder" aria-hidden="true">📷</div>
         )}
