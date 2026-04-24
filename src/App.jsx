@@ -174,8 +174,6 @@ export default function App() {
             </p>
           </div>
           <nav className="nav" aria-label="Primary">
-            <a href="#intro">Intro</a>
-            <a href="#interests">Study</a>
             <a href="#fortune">Fortune</a>
             <a href="#goals">Goals</a>
             <button
