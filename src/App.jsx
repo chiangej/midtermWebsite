@@ -227,21 +227,6 @@ export default function App() {
               real-world pressure. This page is a quiet corner to share who I am
               and what I’m growing toward.
             </p>
-            <div className="actions">
-              <a className="btn btn-primary" href="#intro">
-                <span>Read my intro</span>
-                <span className="btn__glyph" aria-hidden="true">
-                  →
-                </span>
-              </a>
-              <a
-                className="btn btn-ghost"
-              
-                rel="noopener noreferrer"
-              >
-                My GitHub
-              </a>
-            </div>
           </div>
 
           <div className="hero-card">
